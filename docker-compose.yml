@@ -1,0 +1,82 @@
+# Fixed project name: containers, network, and volume are always named lablend-*
+name: lablend
+
+services:
+  proxy:
+    build: ./proxy
+    image: lablend/proxy:${TAG:-dev}
+    ports:
+      - "8080:80"            # the ONLY port published to the host
+    depends_on:
+      frontend:
+        condition: service_healthy
+      items-api:
+        condition: service_healthy
+      borrow-api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [lablend-net]
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        BUILD_NUMBER: ${TAG:-dev}   # printed in the page footer
+    image: lablend/frontend:${TAG:-dev}
+    restart: unless-stopped
+    networks: [lablend-net]
+
+  items-api:
+    build:
+      context: ./items-api
+      target: production
+    image: lablend/items-api:${TAG:-dev}
+    environment:
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [lablend-net]
+
+  borrow-api:
+    build:
+      context: ./borrow-api
+      target: production
+    image: lablend/borrow-api:${TAG:-dev}
+    environment:
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [lablend-net]
+
+  db:
+    build: ./db
+    image: lablend/db:${TAG:-dev}
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data   # named volume = data survives redeploys
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [lablend-net]   # no "ports:" -> database is NOT reachable from outside
+
+volumes:
+  db-data:
+
+networks:
+  lablend-net:

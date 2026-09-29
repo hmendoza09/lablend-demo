@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LabLend</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #f5f7fa; color: #222; }
+    h1 { color: #1a4d8f; margin-bottom: 4px; }
+    .subtitle { color: #555; margin-top: 0; }
+    section { background: #fff; border-radius: 8px; padding: 16px 20px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #e3e3e3; }
+    input, select, button { padding: 6px 10px; margin: 4px 4px 4px 0; font-size: 14px; }
+    button { background: #1a4d8f; color: #fff; border: 0; border-radius: 4px; cursor: pointer; }
+    .ok { color: #1b7f3b; font-weight: bold; } .no { color: #b3261e; font-weight: bold; }
+    #msg { color: #b3261e; min-height: 1.2em; }
+    footer { text-align: center; color: #777; font-size: 13px; margin-top: 24px; }
+    .build { background: #1a4d8f; color: #fff; padding: 2px 8px; border-radius: 10px; }
+  </style>
+</head>
+<body>
+  <h1>LabLend: Lab Equipment Borrowing</h1>
+  <p class="subtitle">Borrow and return laboratory equipment</p>
+  <p id="msg"></p>
+
+  <section>
+    <h2>Equipment</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Status</th></tr></thead>
+      <tbody id="items"></tbody>
+    </table>
+    <h3>Add equipment</h3>
+    <input id="itemName" placeholder="Name (e.g. Oscilloscope)">
+    <input id="itemCategory" placeholder="Category (e.g. Measuring tool)">
+    <button onclick="addItem()">Add</button>
+  </section>
+
+  <section>
+    <h2>Borrow equipment</h2>
+    <select id="borrowItem"></select>
+    <input id="borrowerName" placeholder="Borrower name">
+    <button onclick="borrow()">Borrow</button>
+  </section>
+
+  <section>
+    <h2>Borrow records</h2>
+    <table>
+      <thead><tr><th>#</th><th>Item</th><th>Borrower</th><th>Borrowed</th><th>Due</th><th>Status</th><th></th></tr></thead>
+      <tbody id="borrows"></tbody>
+    </table>
+  </section>
+
+  <footer>LabLend &middot; <span class="build">Build __BUILD__</span></footer>
+
+  <script>
+    const msg = (text) => document.getElementById("msg").textContent = text || "";
+
+    async function api(url, options = {}) {
+      const res = await fetch(url, { headers: { "Content-Type": "application/json" }, ...options });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || (body.errors || []).join(", ") || res.statusText);
+      return body;
+    }
+
+    async function loadItems() {
+      const items = await api("/api/items/");
+      document.getElementById("items").innerHTML = items.map(i =>
+        `<tr><td>${i.id}</td><td>${i.name}</td><td>${i.category}</td>
+         <td class="${i.available ? "ok" : "no"}">${i.available ? "Available" : "Borrowed"}</td></tr>`).join("");
+      document.getElementById("borrowItem").innerHTML = items.filter(i => i.available)
+        .map(i => `<option value="${i.id}">${i.name}</option>`).join("");
+    }
+
+    async function loadBorrows() {
+      const rows = await api("/api/borrows/");
+      document.getElementById("borrows").innerHTML = rows.map(b =>
+        `<tr><td>${b.id}</td><td>${b.item_name}</td><td>${b.borrower_name}</td>
+         <td>${b.borrow_date}</td><td>${b.due_date}</td><td>${b.status}</td>
+         <td>${b.status === "borrowed" ? `<button onclick="returnItem(${b.id})">Return</button>` : ""}</td></tr>`).join("");
+    }
+
+    async function refresh() {
+      try { await Promise.all([loadItems(), loadBorrows()]); } catch (e) { msg(e.message); }
+    }
+
+    async function addItem() {
+      try {
+        await api("/api/items/", { method: "POST", body: JSON.stringify({
+          name: document.getElementById("itemName").value,
+          category: document.getElementById("itemCategory").value }) });
+        document.getElementById("itemName").value = "";
+        document.getElementById("itemCategory").value = "";
+        msg(); refresh();
+      } catch (e) { msg(e.message); }
+    }
+
+    async function borrow() {
+      try {
+        await api("/api/borrows/", { method: "POST", body: JSON.stringify({
+          item_id: Number(document.getElementById("borrowItem").value),
+          borrower_name: document.getElementById("borrowerName").value }) });
+        document.getElementById("borrowerName").value = "";
+        msg(); refresh();
+      } catch (e) { msg(e.message); }
+    }
+
+    async function returnItem(id) {
+      try { await api(`/api/borrows/${id}/return`, { method: "PATCH" }); msg(); refresh(); }
+      catch (e) { msg(e.message); }
+    }
+
+    refresh();
+  </script>
+</body>
+</html>
