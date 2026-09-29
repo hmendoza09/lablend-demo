@@ -53,9 +53,9 @@ pipeline {
             steps {
                 sh '''
                   for i in $(seq 1 20); do
-                    if docker compose exec -T proxy wget -qO- http://localhost/api/items/health >/dev/null 2>&1 \
-                       && docker compose exec -T proxy wget -qO- http://localhost/api/borrows/health >/dev/null 2>&1 \
-                       && docker compose exec -T proxy wget -qO- http://localhost/ | grep -q "Build ${TAG}"; then
+                    if docker compose exec -T proxy wget -qO- http://127.0.0.1/api/items/health >/dev/null 2>&1 \
+                       && docker compose exec -T proxy wget -qO- http://127.0.0.1/api/borrows/health >/dev/null 2>&1 \
+                       && docker compose exec -T proxy wget -qO- http://127.0.0.1/ | grep -q "Build ${TAG}"; then
                       echo "Smoke test passed: build ${TAG} is live"
                       exit 0
                     fi
@@ -72,7 +72,7 @@ pipeline {
 
     post {
         success {
-            echo "LabLend build ${TAG} is live at http://localhost:8080"
+            echo "LabLend build ${TAG} is live at http://127.0.0.1:8080"
         }
         failure {
             echo "Build ${TAG} failed. The previous version is still running if the failure happened before Deploy."

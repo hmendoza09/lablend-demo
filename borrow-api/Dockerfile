@@ -5,13 +5,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 # Copy the dependency list first so this layer is cached when only code changes
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --default-timeout=120 --retries 10 -r requirements.txt
 COPY . .
 
 # ---------- test: Jenkins runs "docker build --target test" ----------
 # If any pytest test fails, this build step fails, and the pipeline stops.
 FROM base AS test
-RUN pip install --no-cache-dir -r requirements-dev.txt
+RUN pip install --no-cache-dir --default-timeout=120 --retries 10 -r requirements-dev.txt
 RUN python -m pytest -v
 
 # ---------- production: what actually runs ----------
